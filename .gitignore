@@ -1,0 +1,7 @@
+target/
+.bsp/
+/.metals
+/.idea
+selenium/
+node_modules/
+csv_out/
