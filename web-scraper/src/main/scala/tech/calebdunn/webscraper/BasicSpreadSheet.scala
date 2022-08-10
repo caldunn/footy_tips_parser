@@ -1,4 +1,6 @@
-import org.apache.poi.hssf.usermodel.*
+package tech.calebdunn.webscraper
+import common.Round
+import org.apache.poi.hssf.usermodel.{HSSFSheet, HSSFWorkbook}
 
 import java.io.FileOutputStream
 

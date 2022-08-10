@@ -78,16 +78,13 @@ lazy val cliInterface = (project in file("cli-interface"))
 val tapirVersion = "1.0.2"
 lazy val tapirApi = (project in file("tapir-api"))
   .settings(
-    // zioMain,
     name                := "tapir-api",
     reStart / mainClass := Some("tech.caleb.dunn.Main"),
     reLogTag            := "\u0008", // Sadge... Doesn't get rid of gap.
 
     Compile / resourceDirectory := baseDirectory.value / "src/resources",
     assembly / assemblyMergeStrategy := {
-      //      case PathList("org", "openqa", "selenium", "remote", "http", "netty", xs @ _*) =>
-      //        println(s"$xs")
-      //        MergeStrategy.first
+
       case PathList("META-INF", "MANIFEST.MF")                  => MergeStrategy.discard
       case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.first
       case x                                                    => MergeStrategy.first
@@ -106,23 +103,12 @@ lazy val tapirApi = (project in file("tapir-api"))
       "com.softwaremill.sttp.tapir"           %% "tapir-sttp-stub-server"   % tapirVersion % Test,
       "dev.zio"                               %% "zio-test"                 % "2.0.0"      % Test,
       "dev.zio"                               %% "zio-test-sbt"             % "2.0.0"      % Test,
-      "com.softwaremill.sttp.client3"         %% "jsoniter"                 % "3.7.2"      % Test
+      "com.softwaremill.sttp.client3"         %% "jsoniter"                 % "3.7.2"      % Test,
 
 //      "dev.zio"                               %% "zio"                      % ZIO,
-//      "com.softwaremill.sttp.tapir"           %% "tapir-zio-http-server"    % tapirVersion,
+      "com.softwaremill.sttp.tapir" %% "tapir-zio-http-server" % tapirVersion,
 //      "com.softwaremill.sttp.shared"          %% "zio"                      % "1.3.6",
-//      "com.softwaremill.sttp.tapir"           %% "tapir-http4s-server-zio"  % "1.0.2",
-//      "com.softwaremill.sttp.tapir"           %% "tapir-prometheus-metrics" % tapirVersion,
-//      "com.softwaremill.sttp.tapir"           %% "tapir-swagger-ui-bundle"  % tapirVersion,
-//      "com.softwaremill.sttp.tapir"           %% "tapir-jsoniter-scala"     % tapirVersion,
-//      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"      % "2.13.37",
-//      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros"    % "2.13.37",
-//      "com.typesafe.scala-logging"            %% "scala-logging"            % "3.9.5",
-//      "ch.qos.logback"                         % "logback-classic"          % "1.2.11",
-//      "com.softwaremill.sttp.tapir"           %% "tapir-sttp-stub-server"   % tapirVersion % Test,
-//      "dev.zio"                               %% "zio-test"                 % "2.0.0"      % Test,
-//      "dev.zio"                               %% "zio-test-sbt"             % "2.0.0"      % Test,
-//      "com.softwaremill.sttp.client3"         %% "jsoniter"                 % "3.7.1"      % Test
+      "com.softwaremill.sttp.tapir" %% "tapir-http4s-server-zio" % "1.0.2"
     ),
     testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
   )

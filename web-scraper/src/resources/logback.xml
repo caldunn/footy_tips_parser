@@ -11,7 +11,7 @@
     <logger name="io.netty" level="WARN" />
     <logger name="org.asynchttpclient.netty" level="WARN" />
 
-    <root level="TRACE">
+    <root level="DEBUG">
         <appender-ref ref="stdout" />
     </root>
 </configuration>

@@ -2,6 +2,7 @@ package tech.caleb.dunn
 
 import com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec
 import com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker
+import common.{Round, arrayRoundCodec}
 import org.http4s.HttpRoutes
 import sttp.capabilities.zio.ZioStreams
 import sttp.model.sse.ServerSentEvent
@@ -11,15 +12,24 @@ import sttp.tapir.server.http4s.ztapir.{ZHttp4sServerInterpreter, serverSentEven
 import sttp.tapir.server.metrics.prometheus.PrometheusMetrics
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import sttp.tapir.ztapir.*
-import sttp.tapir.{CodecFormat, PublicEndpoint, Schema, endpoint, query, stringBody}
-import tech.caleb.dunn.Library.*
+import sttp.tapir.{AnyEndpoint, CodecFormat, Endpoint, PublicEndpoint, Schema, endpoint, query, stringBody}
+import tech.calebdunn.webscraper.*
 import zio.stream.{Stream, ZStream}
 import zio.{Schedule, Task, ZIO, durationInt}
 
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.atomic.AtomicReference
-
 object Endpoints {
+
+  implicit val codecSignin: JsonValueCodec[ScrapeRequest] = JsonCodecMaker.make
+  val signInEndpoint: PublicEndpoint[ScrapeRequest, Unit, MyStream, ZioStreams] = endpoint
+    .post
+    .in("signin")
+    .in(jsonBody[ScrapeRequest])
+    .out(serverSentEventsBody)
+
+  val signinServer: ZServerEndpoint[Any, ZioStreams] =
+    signInEndpoint.serverLogicSuccess { v =>
+      ZIO.succeed(countTo10)
+    }
 
   type pingEndpointHeaders = (Option[String], Option[Int])
   val pingEndpoint: PublicEndpoint[pingEndpointHeaders, Unit, String, Any] = endpoint
@@ -27,71 +37,77 @@ object Endpoints {
     .in("ping")
     .in(header[Option[String]]("my-header"))
     .in(header[Option[Int]]("my-age"))
-    .out(header("Access-Control-Allow-Origin", "*"))
     .out(stringBody)
 
   val pingServerEndpoint: ZServerEndpoint[Any, Any] =
-    pingEndpoint.serverLogicSuccess(v => ZIO.succeed(s"pongers $v"))
+    pingEndpoint.serverLogicSuccess { v =>
+      ZIO.succeed("pong")
+    }
+
+  val pingPersonEndpoint: PublicEndpoint[pingEndpointHeaders, Unit, String, Any] = endpoint
+    .get
+    .in("pingCrash")
+    .in(header[Option[String]]("my-header"))
+    .in(header[Option[Int]]("my-age"))
+    .out(stringBody)
+
+  val pingPersonServerEndpoint: ZServerEndpoint[Any, Any] =
+    pingPersonEndpoint.serverLogic { v =>
+      v._1 match {
+        case None    => ZIO.fail(new Exception("e"))
+        case Some(_) => ZIO.succeed(Right("pong"))
+      }
+    }
 
   type MyStream = Stream[Throwable, ServerSentEvent]
   val streamPoint: PublicEndpoint[Unit, Unit, MyStream, ZioStreams] = endpoint
     .get
     .in("cd")
-    .out(header("Access-Control-Allow-Origin", "*"))
     .out(serverSentEventsBody)
-  // .out(streamTextBody(ZioStreams)(CodecFormat.TextEventStream(), Some(StandardCharsets.UTF_8)))
 
   val countTo10: MyStream =
     ZStream
-      .fromIterable(1 to 20)
-      .map(i => ServerSentEvent(Some(s"round -> $i!")))
+      .fromIterable(1 to 10)
+      .map(i => ServerSentEvent(Some(s"round -> $i!"), id = Some(s"$i"), eventType = Some("round-update")))
       .schedule(Schedule.spaced(500.millis))
-      .tap(zio.Console.printLine(_))
+      .tap(zio.Console.printLine(_)) ++ more
+
+  val more: MyStream =
+    ZStream
+      .fromIterable(11 to 20)
+      .map(i => ServerSentEvent(Some(s"round -> $i!"), id = Some(s"$i"), eventType = Some("round-update")))
+      .schedule(Schedule.spaced(500.millis))
 
   val streamServer: ZServerEndpoint[Any, ZioStreams] =
     streamPoint.zServerLogic(_ => ZIO.succeed(countTo10))
 
-  val routes: HttpRoutes[Task] =
-    ZHttp4sServerInterpreter().from {
-      streamServer
-    }
-      // ZIO.succeed(ZStream(ServerSentEvent(Some("data"), None, None, None)))))
-      .toRoutes
-
-  implicit val codecBooks: JsonValueCodec[List[Book]] = JsonCodecMaker.make
-  val booksListing: PublicEndpoint[Unit, Unit, List[Book], Any] = endpoint
+  val results: PublicEndpoint[Unit, Unit, Array[Round], Any] = endpoint
     .get
-    .in("books" / "list" / "all")
-    .out(jsonBody[List[Book]])
+    .in("results")
+    .out(jsonBody[Array[Round]])
 
-  val booksListingServerEndpoint: ZServerEndpoint[Any, Any] =
-    booksListing.serverLogicSuccess(_ => ZIO.succeed(books.get()))
+  val resultsServerEndpoint: ZServerEndpoint[Any, Any] =
+    results.serverLogicSuccess(_ => TempInterface.writtenArray.delay(1.seconds))
 
   val prometheusMetrics: PrometheusMetrics[Task] = PrometheusMetrics.default[Task]()
   val metricsEndpoint: ZServerEndpoint[Any, Any] = prometheusMetrics.metricsEndpoint
 
+  val forDocs: List[AnyEndpoint] = List(
+    metricsEndpoint.endpoint,
+    streamServer.endpoint,
+    signInEndpoint,
+    pingServerEndpoint.endpoint
+  )
   val docEndpoints: List[ZServerEndpoint[Any, Any]] =
     SwaggerInterpreter()
-      .fromEndpoints[Task](List(metricsEndpoint.endpoint, booksListing), "footy_tips_scraper", "1.0.0")
+      .fromEndpoints[Task](forDocs, "ESPN Footy Tips Scraper", "1.0.0")
 
-  val all: List[ZServerEndpoint[Any, Any]] =
+  val all: List[ZServerEndpoint[Any, ZioStreams]] =
     List(
       pingServerEndpoint,
-      booksListingServerEndpoint,
+      streamServer,
+      signinServer,
+      resultsServerEndpoint,
       metricsEndpoint
     ) ++ docEndpoints
-}
-
-object Library {
-  case class Author(name: String)
-  case class Book(title: String, year: Int, author: Author)
-
-  val books = new AtomicReference(
-    List(
-      Book("The Sorrows of Young Werther", 1774, Author("Johann Wolfgang von Goethe")),
-      Book("Nad Niemnem", 1888, Author("Eliza Orzeszkowa")),
-      Book("The Art of Computer Programming", 1968, Author("Donald Knuth")),
-      Book("Pharaoh", 1897, Author("Boleslaw Prus"))
-    )
-  )
 }

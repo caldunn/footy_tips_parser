@@ -1,12 +1,15 @@
-import zio.*
-import zio.Console.printLine
-import zio.stream.*
+package tech.calebdunn.webscraper
 
-import java.io.*
-import java.nio.file.{Files, Paths}
-import java.time.Duration
+import common.*
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
+import tech.calebdunn.webscraper.Main.getClass
+import zio.Console.printLine
+import zio.stream.ZStream
+import zio.{ExitCode, Task, URIO, ZIO, ZIOAppArgs, ZIOAppDefault}
+
+import java.io.{File, FileInputStream, FileWriter}
+import java.lang
 
 object Main extends ZIOAppDefault:
 
@@ -28,7 +31,6 @@ object Main extends ZIOAppDefault:
 
   def generateCsv(rounds: Array[Round]) =
     ZIO.attemptBlockingInterrupt {
-
       rounds
         .flatMap(r =>
           r.scoreStats
@@ -42,26 +44,31 @@ object Main extends ZIOAppDefault:
       ZIO
         .writeFile(
           "src/res/csv_out/out.csv",
-          array.fold("")((acc, str) => s"${acc}${str}\n")
+          array.fold("")((acc, str) => s"$acc$str\n")
         )
     }
-  val app: ZIO[Any, Throwable, Unit] =
+
+  val app: ZIO[Any, Any, Unit] =
     for {
-      _ <- printLine("")
+      _ <- printLine("Hello")
+      // _      <- stream.interrupt
 //      contents <- readFromFile
 //       _        <- printLine(contents(0).scoreStats.mkString("Map(", "\n", ")"))
 //      asCsvArray <- generateCsv(contents)
 //      _          <- writeFile(asCsvArray)
-//      _          <- ZIO.attemptBlockingInterrupt(BasicSpreadSheet.default(contents))
-//      _          <- ZIO.attemptBlockingInterrupt(WebScraper.scrape())
     } yield ()
-  val request: ScrapeRequest = ScrapeRequest("email@kek.com", "", 000000)
-  def printRound(scrapeUpdate: ScrapeUpdate): Unit =
-    println(scrapeUpdate)
-  val fullSet = WebScraper.scrape(request, Some(printRound))
-  // val fullSet = Round.loadFromJson(Files.readString(Paths.get("src/res/tempStore/score.json")))
 
-  val asString = Round.arrayToJson(fullSet)
-  val fw       = FileWriter(File("src/resources/tempStore/score_new.json"))
-  fw.write(asString)
-  fw.close()
+//  val request: ScrapeRequest = ScrapeRequest("caldunn@iinet.net.au", "pEX8#4j9w8wTK!%2", 546660)
+//  def printRound(scrapeUpdate: ScrapeUpdate): Unit =
+//    println(scrapeUpdate)
+//  val fullSet = WebScraper.scrape(request, Some(printRound))
+//  // val fullSet = Round.loadFromJson(Files.readString(Paths.get("src/res/tempStore/score.json")))
+//
+//  val asString = Round.arrayToJson(fullSet)
+//  val fw = FileWriter(
+//    File(
+//      s"/home/caleb/dev/jvm/scala/footy_tips_parser/dev_cache/scores/${request.competition}.json"
+//    )
+//  )
+//  fw.write(asString)
+//  fw.close()
