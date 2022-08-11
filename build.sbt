@@ -51,10 +51,11 @@ lazy val webScraper = (project in file("web-scraper"))
       "com.typesafe.scala-logging"            %% "scala-logging"         % "3.9.5",
 
       // Java
-      "org.apache.poi"          % "poi"             % "5.2.2",
-      "org.seleniumhq.selenium" % "selenium-java"   % "4.3.0",
-      "ch.qos.logback"          % "logback-classic" % "1.2.11",
-      "org.slf4j"               % "slf4j-api"       % "1.7.36"
+      "org.apache.poi"           % "poi"             % "5.2.2",
+      "org.apache.logging.log4j" % "log4j-to-slf4j"  % "2.18.0", // Silence the POI logging error.
+      "org.seleniumhq.selenium"  % "selenium-java"   % "4.3.0",
+      "ch.qos.logback"           % "logback-classic" % "1.2.11",
+      "org.slf4j"                % "slf4j-api"       % "1.7.36"
     )
   )
   .dependsOn(common)
@@ -126,7 +127,8 @@ lazy val common = project
       // Use the %%% operator instead of %% for Scala.js and Scala Native
       "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core" % "2.13.37",
       // Use the "provided" scope instead when the "compile-internal" scope is not supported
-      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.13.37" % "provided"
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.13.37" % "provided",
+      "com.lihaoyi"                           %% "os-lib"                % "0.8.1"
     )
   )
 

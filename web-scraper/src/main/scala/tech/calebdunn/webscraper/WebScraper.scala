@@ -57,100 +57,105 @@ object WebScraper {
    * @return
    *   Results of the rounds up to the current round.
    */
-  def scrape(request: ScrapeRequest, cbHandle: Option[ScrapeCallback => Unit] = None)(implicit
+  def scrape(request: ScrapeRequest, range: Option[Range] = None, cbHandle: Option[ScrapeCallback => Unit] = None)(
+    implicit
     logger: Logger,
     ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
-  ): Future[Unit] =
-    Future {
-      val fullSet: ArrayBuffer[Round] = ArrayBuffer()
+  ): Array[Round] =
 
-      given implicitRequest: ScrapeRequest = request
+    val fullSet: ArrayBuffer[Round] = ArrayBuffer()
 
-      val options = ChromeOptions()
-        .addArguments(Config.default.chromeFlags.asJava)
-      // .setBinary("/usr/bin/chromium")
-      // .setBinary("/home/caleb/dev/jvm/scala/footy_tips_parser/web-scraper/src/resources/chromedriver")
+    given implicitRequest: ScrapeRequest = request
 
-      val driver: ChromeDriver = ChromeDriver(options)
+    val options = ChromeOptions()
+      .addArguments(Config.default.chromeFlags.asJava)
+    // .setBinary("/usr/bin/chromium")
+    // .setBinary("/home/caleb/dev/jvm/scala/footy_tips_parser/web-scraper/src/resources/chromedriver")
 
-      given wait: FluentWait[ChromeDriver] = FluentWait[ChromeDriver](driver)
-        .withTimeout(Duration.ofSeconds(10))
-        .pollingEvery(Duration.ofMillis(100))
-        .ignoring(classOf[org.openqa.selenium.NoSuchElementException])
+    val driver: ChromeDriver = ChromeDriver(options)
 
-      try {
-        driver.get("https://www.footytips.com.au/home")
+    given wait: FluentWait[ChromeDriver] = FluentWait[ChromeDriver](driver)
+      .withTimeout(Duration.ofSeconds(10))
+      .pollingEvery(Duration.ofMillis(100))
+      .ignoring(classOf[org.openqa.selenium.NoSuchElementException])
 
-        if Option(driver.manage().getCookieNamed("ESPN-FOOTYTIPS.WEB-PROD.token")).isEmpty then {
-          signIn(driver)
-        }
+    try {
+      driver.get("https://www.footytips.com.au/home")
 
+      if Option(driver.manage().getCookieNamed("ESPN-FOOTYTIPS.WEB-PROD.token")).isEmpty then {
+        signIn(driver)
+      }
+
+      driver
+        .navigate()
+        .to(
+          "https://www.footytips.com.au/competitions/afl/siteladder"
+        )
+
+      val currentRound = wait.until { driver =>
+        driver.findElement(
+          By.id("round")
+        )
+      }.getText
+        .split("\n")
+        .dropRight(1)
+        .last
+        .split(" ")
+        .last
+        .toInt
+
+      val mRange = range match {
+        case Some(value) => value
+        case None        => 0 to currentRound
+      }
+      for (i <- mRange) {
+        logger.info(s"${request.user} scraping round $i in comp# ${request.competition}")
         driver
           .navigate()
           .to(
-            "https://www.footytips.com.au/competitions/afl/siteladder"
+            s"https://www.footytips.com.au/competitions/afl/ladders/?competitionId=${request.competition}&gameCompId=317695&gameType=tips&view=ladderScores&round=$i&sort=1&ref=ladder-round-afl"
           )
 
-        val currentRound = wait.until { driver =>
+        case class Layout(grouped: Int, mapFun: Array[String] => Array[String])
+        val layout: Layout = if (i != currentRound) {
+          Layout(4 + i, (arr: Array[String]) => arr)
+        } else {
+          Layout(3 + i, _ :+ "")
+        }
+
+        val roundStats = wait.until { driver =>
           driver.findElement(
-            By.id("round")
+            By.xpath(
+              "//*[@class=\"table ladder-main table-horizontal ladder-mini comps-ladder scrollable-table ng-scope tipping\"]"
+            )
           )
         }.getText
-          .split("\n")
-          .dropRight(1)
-          .last
-          .split(" ")
-          .last
-          .toInt
+          .split('\n')
+          .drop(1)
+          .grouped(layout.grouped)
+          .toArray
+          .map(layout.mapFun)
+          .map(ScoreStats.fromArray)
+          .map(_.toKeyPair)
+          .toMap
 
-        for (i <- 1 to currentRound) {
-          logger.info(s"${request.user} scraping round $i in comp# ${request.competition}")
-          driver
-            .navigate()
-            .to(
-              s"https://www.footytips.com.au/competitions/afl/ladders/?competitionId=${request.competition}&gameCompId=317695&gameType=tips&view=ladderScores&round=$i&sort=1&ref=ladder-round-afl"
-            )
-
-          case class Layout(grouped: Int, mapFun: Array[String] => Array[String])
-          val layout: Layout = if (i != currentRound) {
-            Layout(4 + i, (arr: Array[String]) => arr)
-          } else {
-            Layout(3 + i, _ :+ "")
-          }
-
-          val roundStats = wait.until { driver =>
-            driver.findElement(
-              By.xpath(
-                "//*[@class=\"table ladder-main table-horizontal ladder-mini comps-ladder scrollable-table ng-scope tipping\"]"
-              )
-            )
-          }.getText
-            .split('\n')
-            .drop(1)
-            .grouped(layout.grouped)
-            .toArray
-            .map(layout.mapFun)
-            .map(ScoreStats.fromArray)
-            .map(_.toKeyPair)
-            .toMap
-
-          val round       = Round(i, roundStats)
-          val roundUpdate = ScrapeUpdate(request.user, request.competition, RoundUpdate(i))
-          cbHandle.foreach(cb => cb(roundUpdate))
-          fullSet.addOne(round)
-        }
-      } catch {
-        case e: Exception =>
-          cbHandle.foreach(cb =>
-            cb(ScrapeResult(request.user, request.competition, fullSet.toArray, ScrapeExitStatus.ERROR))
-          )
-      } finally {
-        driver.quit()
+        val round       = Round(i, roundStats)
+        val roundUpdate = ScrapeUpdate(request.user, request.competition, RoundUpdate(i))
+        cbHandle.foreach(cb => cb(roundUpdate))
+        fullSet.addOne(round)
       }
-      cbHandle.foreach(cb =>
-        cb(ScrapeResult(request.user, request.competition, fullSet.toArray, ScrapeExitStatus.SUCCESS))
-      )
+    } catch {
+      case _: Exception =>
+        cbHandle.foreach(cb =>
+          cb(ScrapeResult(request.user, request.competition, fullSet.toArray, ScrapeExitStatus.ERROR))
+        )
+    } finally {
+      driver.quit()
     }
+    cbHandle.foreach(cb =>
+      cb(ScrapeResult(request.user, request.competition, fullSet.toArray, ScrapeExitStatus.SUCCESS))
+    )
+    fullSet.toArray
 
   /**
    * Transforms Seleniums cookies to Sttp Cookies.

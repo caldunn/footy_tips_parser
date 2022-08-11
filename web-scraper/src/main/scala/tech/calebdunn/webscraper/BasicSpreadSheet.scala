@@ -1,11 +1,13 @@
 package tech.calebdunn.webscraper
+
 import common.Round
 import org.apache.poi.hssf.usermodel.{HSSFSheet, HSSFWorkbook}
-
+import org.apache.logging.log4j.*
 import java.io.FileOutputStream
 
 object BasicSpreadSheet {
-  def default(rounds: Array[Round]): Unit = {
+
+  def default(rounds: Array[Round])(implicit logger: org.slf4j.Logger): Unit = {
     val wb = HSSFWorkbook()
 
     for (round <- rounds) {
@@ -20,9 +22,10 @@ object BasicSpreadSheet {
       }
     }
 
-    val file = FileOutputStream("src/res/csv_out/workbook.xls")
+    val file = FileOutputStream("/home/caleb/dev/jvm/scala/footy_tips_parser/dev_cache/output/workbook.xls")
     wb.write(file)
   }
+
   def createHeader(sheet: HSSFSheet): Unit = {
     val header = sheet.createRow(0)
     header.createCell(0).setCellValue("Position")

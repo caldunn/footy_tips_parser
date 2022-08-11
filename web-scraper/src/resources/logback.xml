@@ -10,6 +10,7 @@
     <!-- Restrict logging for browser-level -->
     <logger name="io.netty" level="WARN" />
     <logger name="org.asynchttpclient.netty" level="WARN" />
+    <Logger name="org.apache.poi" level="OFF" />
 
     <root level="DEBUG">
         <appender-ref ref="stdout" />
