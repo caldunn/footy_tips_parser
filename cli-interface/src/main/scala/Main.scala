@@ -42,7 +42,6 @@ object Main extends ZIOAppDefault {
       round <- FileIO.readRoundsFromFile(fp)
       _     <- printLine(round.length)
     } yield status
-  //    ZIO.acquireRelease()
 
   def requestFromScraper(request: ScrapeRequest, range: Option[Range] = None): Task[Array[Round]] =
     for {
@@ -66,6 +65,14 @@ object Main extends ZIOAppDefault {
       common.FileIO.writeToFile(path, s)
     }
 
+  // Not currently used.
+  val asStream =
+    val request = ScrapeRequest("123", "123", 123)
+    for {
+      stream2 <- TempInterface.scrapeZIO(request, Some(0 to 21)).runCollect
+      _       <- printLine(stream2)
+    } yield ()
+
   val app: ZIO[ZIOAppArgs, Any, Unit] =
     for {
       args          <- getArgs
@@ -73,11 +80,9 @@ object Main extends ZIOAppDefault {
       cachedResult  <- checkCache(scrapeRequest.competition)
       rounds        <- fetchRounds(cachedResult, scrapeRequest)
       f1            <- saveToCache(os.Path(s"$cache_dir/${scrapeRequest.competition}.json"), rounds).fork
-      _             <- ZIO.attempt(BasicSpreadSheet.default(rounds))
+      _             <- ZIO.attempt(BasicSpreadSheet.default(rounds, s"${scrapeRequest.competition}.xls"))
       _             <- f1.join
-//      request <- scrapeRequestFromUserInput
-//      stream2 <- TempInterface.scrapeZ(request).runCollect
-//      _       <- printLine(stream2)
+
     } yield ()
 
   val onUnhandledError: IO[IOException, Unit] =
