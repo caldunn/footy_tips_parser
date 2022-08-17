@@ -29,15 +29,15 @@ object Main extends ZIOAppDefault:
       ZIO.attemptBlockingInterrupt(Round.loadFromJsonStream(file))
     }
 
-  def generateCsv(rounds: Array[Round]) =
-    ZIO.attemptBlockingInterrupt {
-      rounds
-        .flatMap(r =>
-          r.scoreStats
-            .map(s => s"${r.round},${s._1},${s._2.asCSV}")
-            .toArray
-        )
-    }
+//  def generateCsv(rounds: Array[Round]) =
+//    ZIO.attemptBlockingInterrupt {
+//      rounds
+//        .flatMap(r =>
+//          r.scoreStats
+//            .map(s => s"${r.round},${s._1},${s._2.asCSV}")
+//            .toArray
+//        )
+//    }
 
   def writeFile(array: Array[String]) =
     ZIO.scoped {

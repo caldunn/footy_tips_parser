@@ -39,8 +39,6 @@ object Main extends ZIOAppDefault {
       exists <- common.FileIO.fileExists(fp)
       status <- if (!exists) ZIO.succeed(CacheResult.DoesNotExist)
                 else readFile
-      round <- FileIO.readRoundsFromFile(fp)
-      _     <- printLine(round.length)
     } yield status
 
   def requestFromScraper(request: ScrapeRequest, range: Option[Range] = None): Task[Array[Round]] =
@@ -68,6 +66,7 @@ object Main extends ZIOAppDefault {
   // Not currently used.
   val asStream =
     val request = ScrapeRequest("123", "123", 123)
+
     for {
       stream2 <- TempInterface.scrapeZIO(request, Some(0 to 21)).runCollect
       _       <- printLine(stream2)
@@ -80,20 +79,19 @@ object Main extends ZIOAppDefault {
       cachedResult  <- checkCache(scrapeRequest.competition)
       rounds        <- fetchRounds(cachedResult, scrapeRequest)
       f1            <- saveToCache(os.Path(s"$cache_dir/${scrapeRequest.competition}.json"), rounds).fork
-      _             <- ZIO.attempt(BasicSpreadSheet.default(rounds, s"${scrapeRequest.competition}.xls"))
+      _             <- ZIO.attempt(BasicSpreadSheet.default(rounds, s"${scrapeRequest.competition}.xlsx"))
       _             <- f1.join
-
     } yield ()
 
-  val onUnhandledError: IO[IOException, Unit] =
-    printLine("\u001B[31;5;3;4m Maccies machine broke!")
+  def onUnhandledError(error: Any): IO[IOException, Unit] =
+    printLine(s"\u001B[31;5;3;4m Maccies machine broke!\n $error")
 
   val appWrapper: ZIO[ZIOAppArgs, IOException, Unit] =
     (for {
       _   <- printLine("\u001B[32m-\u001B[0m" * 60)
       app <- app
       _   <- printLine("\u001B[32m-\u001B[0m" * 60)
-    } yield app).catchAll(_ => onUnhandledError)
+    } yield app).catchAll(e => onUnhandledError(e))
 
   val run: ZIO[ZIOAppArgs, Any, ExitCode] = appWrapper.exitCode
 }

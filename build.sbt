@@ -52,6 +52,7 @@ lazy val webScraper = (project in file("web-scraper"))
 
       // Java
       "org.apache.poi"           % "poi"             % "5.2.2",
+      "org.apache.poi"           % "poi-ooxml"       % "5.2.2",
       "org.apache.logging.log4j" % "log4j-to-slf4j"  % "2.18.0", // Silence the POI logging error.
       "org.seleniumhq.selenium"  % "selenium-java"   % "4.3.0",
       "ch.qos.logback"           % "logback-classic" % "1.2.11",

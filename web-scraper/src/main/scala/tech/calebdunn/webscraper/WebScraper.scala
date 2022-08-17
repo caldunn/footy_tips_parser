@@ -12,6 +12,8 @@ import org.openqa.selenium.remote.{CapabilityType, DesiredCapabilities}
 import org.openqa.selenium.support.ui.{FluentWait, WebDriverWait}
 import org.openqa.selenium.{By, Cookie, Keys, WebElement}
 import org.slf4j.Logger
+
+import java.lang.Runnable
 import java.time.Duration
 import java.util
 import java.util.ServiceLoader
@@ -20,7 +22,6 @@ import java.util.stream.{Collectors, StreamSupport}
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
-import java.lang.Runnable
 
 /**
  * Used to scrape a new competition.
@@ -106,41 +107,82 @@ object WebScraper {
 
       val mRange = range match {
         case Some(value) => value
-        case None        => 0 to currentRound
+        case None        => 1 to currentRound
       }
+
       for (i <- mRange) {
         logger.info(s"${request.user} scraping round $i in comp# ${request.competition}")
         driver
           .navigate()
           .to(
-            s"https://www.footytips.com.au/competitions/afl/ladders/?competitionId=${request.competition}&gameCompId=317695&gameType=tips&view=ladderScores&round=$i&sort=1&ref=ladder-round-afl"
+            s"https://www.footytips.com.au/competitions/afl/ladders/?competitionId=${request.competition}&round=$i&view=ladderTips&gameCompId=317695&sort=1"
           )
 
-        case class Layout(grouped: Int, mapFun: Array[String] => Array[String])
-        val layout: Layout = if (i != currentRound) {
-          Layout(4 + i, (arr: Array[String]) => arr)
-        } else {
-          Layout(3 + i, _ :+ "")
-        }
-
-        val roundStats = wait.until { driver =>
-          driver.findElement(
-            By.xpath(
-              "//*[@class=\"table ladder-main table-horizontal ladder-mini comps-ladder scrollable-table ng-scope tipping\"]"
+        val fullTable =
+          wait.until { driver =>
+            driver.findElement(
+              By.xpath(
+                "//*[@class=\"table ladder-main table-horizontal ladder-mini comps-ladder scrollable-table ng-scope who-tipped-what\"]"
+              )
             )
-          )
-        }.getText
-          .split('\n')
-          .drop(1)
-          .grouped(layout.grouped)
-          .toArray
-          .map(layout.mapFun)
-          .map(ScoreStats.fromArray)
-          .map(_.toKeyPair)
+          }
+
+        val gameResults =
+          fullTable
+            .findElements(By.tagName("th"))
+            .asScala
+            .drop(2)
+            .dropRight(2) // Clean the table elements we dont care about.
+            .zipWithIndex
+            .map { (e, i) =>
+              val teamsRaw = e
+                .getText
+                .split("\n")
+                .take(2)
+                .map(Club.fromText)
+              val (home, away) = (teamsRaw(0), teamsRaw(1))
+              val winner       = Club.fromText(e.findElement(By.className("winner")).getText)
+              Game(i + 1, home, away, winner)
+            }
+            .toArray
+
+        val headerLength =
+          fullTable.getText.split("\n").takeWhile(!_.contains("ROUND")).length + 1
+        val gamesPlayed =
+          (headerLength - 3) / 2 + 4 // Remove score and name and divide by two as each game takes 2 cols in memory.
+        val tableBodyContents = fullTable.getText.split("\n").drop(headerLength)
+
+        // Read the table into a round entry.
+        case class ScoresLocal(rScore: ScorePair, tScore: ScorePair)
+        def asScorePair(score: (String, String)): ScoresLocal =
+          ScoresLocal(ScorePair.fromTableString(score._1), ScorePair.fromTableString(score._2))
+        type PosUser = (Int, String)
+        val roundMap = tableBodyContents
+          .grouped(gamesPlayed)
+          .map { row =>
+            val tips =
+              row
+                .drop(2)
+                .dropRight(2)
+                .zipWithIndex
+                .map { tip =>
+                  tip._1.toUpperCase match {
+                    case "CORRECT"   => gameResults(tip._2).winner
+                    case "INCORRECT" => gameResults(tip._2).loser
+                    case "NO TIP"    => gameResults(tip._2).home
+                    case _           => gameResults(tip._2).home
+                  }
+                }
+            val user: PosUser    = (row(0).toInt, row(1))
+            val score            = asScorePair(row.takeRight(2).head, row.last)
+            val scoreStatsNoName = ScoreStats(user._1, score.rScore, score.tScore)
+            user._2 -> ScoreWithTips(scoreStatsNoName, tips)
+          }
           .toMap
 
-        val round       = Round(i, roundStats)
+        val round       = Round(i, roundMap, gameResults)
         val roundUpdate = ScrapeUpdate(request.user, request.competition, RoundUpdate(i))
+
         cbHandle.foreach(cb => cb(roundUpdate))
         fullSet.addOne(round)
       }
