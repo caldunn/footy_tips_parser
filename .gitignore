@@ -6,3 +6,4 @@ selenium/
 node_modules/
 csv_out/
 dev_cache/
+*.xlsx

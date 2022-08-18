@@ -3,14 +3,13 @@ package common
 import com.github.plokhotnyuk.jsoniter_scala.core.*
 import com.github.plokhotnyuk.jsoniter_scala.macros.{CodecMakerConfig, *}
 import common.Club.reversed
-
 import java.io.InputStream
 import scala.collection.mutable.ArrayBuffer
 
 //given CodecMakerConfig.PrintCodec with {}
 
 case class ScorePair(score: Int, margin: Int) extends Ordered[ScorePair] {
-  override def compare(that: ScorePair): Int = if (score < that.score) -1
+  override def compare(that: ScorePair): Int = if (score < that.score) - 1
   else if (score > that.score) 1
   else {
     if (margin == that.margin) 0
@@ -93,7 +92,11 @@ case class Game(roundOrder: Int, home: Club, away: Club, winner: Club) {
 
 implicit val arrayRoundCodec: JsonValueCodec[Array[Round]] = JsonCodecMaker.make
 
-case class Round(round: Int, scoreStats: Map[String, ScoreWithTips], games: Array[Game])
+type ZippedPlayers = Array[((String, ScoreWithTips), Int)]
+case class Round(round: Int, scoreStats: Map[String, ScoreWithTips], games: Array[Game]) {
+  def sortByRoundScore: ZippedPlayers = scoreStats.toArray.sortBy(_._2.scoreStats.roundScore).reverse.zipWithIndex
+  def sortByTotalScore: ZippedPlayers = scoreStats.toArray.sortBy(_._2.scoreStats.totalScore).reverse.zipWithIndex
+}
 object Round {
   private val writerConfig: WriterConfig                    = WriterConfig.withIndentionStep(2)
   def arrayToJson(values: Array[Round]): String             = writeToString(values)
