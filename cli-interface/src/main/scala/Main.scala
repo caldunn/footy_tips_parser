@@ -1,13 +1,12 @@
 import com.typesafe.scalalogging.Logger
+import common.*
 import org.slf4j.LoggerFactory
+import os.Path
 import tech.calebdunn.webscraper.*
-import tech.calebdunn.webscraper.Main.getClass
 import zio.*
 import zio.Console.*
 import zio.Duration.*
 import zio.stream.*
-import common.*
-import os.Path
 
 import java.io.IOException
 
@@ -44,7 +43,7 @@ object Main extends ZIOAppDefault {
   def requestFromScraper(request: ScrapeRequest, range: Option[Range] = None): Task[Array[Round]] =
     for {
       rounds <- TempInterface.scrapeZIOSync(request, range)
-    } yield (rounds)
+    } yield rounds
 
   def fetchRounds(status: CacheResult, request: ScrapeRequest): Task[Array[Round]] =
     status match {
@@ -64,9 +63,8 @@ object Main extends ZIOAppDefault {
     }
 
   // Not currently used.
-  val asStream =
+  val asStream: IO[Any, Unit] =
     val request = ScrapeRequest("123", "123", 123)
-
     for {
       stream2 <- TempInterface.scrapeZIO(request, Some(0 to 21)).runCollect
       _       <- printLine(stream2)

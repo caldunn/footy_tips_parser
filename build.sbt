@@ -5,8 +5,10 @@ ThisBuild / organizationName  := "example"
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 // Versions
-val ZIO  = "0.0.0+1-e54a59df-SNAPSHOT"
-val STTP = "3.7.1"
+val ZIO      = "0.0.0+1-e54a59df-SNAPSHOT"
+val STTP     = "3.7.1"
+val JSONITER = "2.13.38"
+
 lazy val zioMain = Seq(
   fork := true
 )
@@ -16,16 +18,7 @@ lazy val root = (project in file("."))
     name := "footy_tips_parser",
     welcomeMessage
   )
-  .aggregate(cliInterface, tapirApi, webScraper, smithy4s)
-
-// import smithy4s.codegen.Smithy4sCodegenPlugin
-lazy val smithy4s = project
-  .in(file("smithy4s"))
-  .enablePlugins(Smithy4sCodegenPlugin)
-  // version for smithy4s-core is sourced from Smithy4sCodegenPlugin
-  .settings(
-    libraryDependencies += "com.disneystreaming.smithy4s" %% "smithy4s-core" % smithy4sVersion.value
-  ) //"0.14.2")
+  .aggregate(cliInterface, tapirApi, webScraper)
 
 lazy val webScraper = (project in file("web-scraper"))
   .settings(
@@ -38,16 +31,11 @@ lazy val webScraper = (project in file("web-scraper"))
       case x                                                    => MergeStrategy.first
     },
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio"         % ZIO,
-      "dev.zio" %% "zio-streams" % ZIO,
-      "dev.zio" %% "zio-test"    % ZIO % Test,
-
-//      "com.softwaremill.sttp.client3" %% "zio"      % STTP,
-
-      // Use the %%% operator instead of %% for Scala.js and Scala Native
-      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core" % "2.13.37",
-      // Use the "provided" scope instead when the "compile-internal" scope is not supported
-      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.13.37" % "provided",
+      "dev.zio"                               %% "zio"                   % ZIO,
+      "dev.zio"                               %% "zio-streams"           % ZIO,
+      "dev.zio"                               %% "zio-test"              % ZIO      % Test,
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"   % JSONITER,
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % JSONITER % "provided",
       "com.typesafe.scala-logging"            %% "scala-logging"         % "3.9.5",
 
       // Java
@@ -77,7 +65,7 @@ lazy val cliInterface = (project in file("cli-interface"))
   )
   .dependsOn(common, webScraper)
 
-val tapirVersion = "1.0.2"
+val tapirVersion = "1.0.3"
 lazy val tapirApi = (project in file("tapir-api"))
   .settings(
     name                := "tapir-api",
@@ -94,7 +82,7 @@ lazy val tapirApi = (project in file("tapir-api"))
     libraryDependencies ++= Seq(
       "com.softwaremill.sttp.tapir"           %% "tapir-http4s-server-zio"  % tapirVersion,
       "com.softwaremill.sttp.tapir"           %% "tapir-http4s-server"      % tapirVersion,
-      "org.http4s"                            %% "http4s-ember-server"      % "0.23.12",
+      "org.http4s"                            %% "http4s-ember-server"      % "0.23.14",
       "org.http4s"                            %% "http4s-blaze-server"      % "0.23.12",
       "com.softwaremill.sttp.tapir"           %% "tapir-prometheus-metrics" % tapirVersion,
       "com.softwaremill.sttp.tapir"           %% "tapir-swagger-ui-bundle"  % tapirVersion,
@@ -106,34 +94,24 @@ lazy val tapirApi = (project in file("tapir-api"))
       "dev.zio"                               %% "zio-test"                 % "2.0.0"      % Test,
       "dev.zio"                               %% "zio-test-sbt"             % "2.0.0"      % Test,
       "com.softwaremill.sttp.client3"         %% "jsoniter"                 % "3.7.2"      % Test,
-
-//      "dev.zio"                               %% "zio"                      % ZIO,
-      "com.softwaremill.sttp.tapir" %% "tapir-zio-http-server" % tapirVersion,
-//      "com.softwaremill.sttp.shared"          %% "zio"                      % "1.3.6",
-      "com.softwaremill.sttp.tapir" %% "tapir-http4s-server-zio" % "1.0.2"
+      "com.softwaremill.sttp.tapir"           %% "tapir-zio-http-server"    % tapirVersion,
+      "com.softwaremill.sttp.tapir"           %% "tapir-http4s-server-zio"  % tapirVersion
     ),
     testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
   )
   .dependsOn(common, webScraper)
+
 lazy val common = project
   .settings(
-//    libraryDependencies ++= Seq(
-//      "org.apache.poi" % "poi" % "5.2.2"
-//    )
-  )
-  .settings(
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio"      % ZIO,
-      "dev.zio" %% "zio-test" % ZIO % Test,
-      // Use the %%% operator instead of %% for Scala.js and Scala Native
-      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core" % "2.13.37",
-      // Use the "provided" scope instead when the "compile-internal" scope is not supported
-      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.13.37" % "provided",
+      "dev.zio"                               %% "zio"                   % ZIO,
+      "dev.zio"                               %% "zio-test"              % ZIO      % Test,
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"   % JSONITER,
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % JSONITER % "provided",
       "com.lihaoyi"                           %% "os-lib"                % "0.8.1"
     )
   )
 
-// lazy val webUI = (project in file("web-ui")).settings(name := "web-ui")
 def welcomeMessage = onLoadMessage := {
   import scala.Console
 
