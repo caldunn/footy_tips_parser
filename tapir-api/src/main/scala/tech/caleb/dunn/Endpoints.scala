@@ -2,7 +2,8 @@ package tech.caleb.dunn
 
 import com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec
 import com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker
-import common.{Round, arrayRoundCodec}
+import common.Implicits.scrapeResultDataCodec
+import common.{Round, ScoreWithTips, ScrapeResultData}
 import org.http4s.HttpRoutes
 import sttp.capabilities.zio.ZioStreams
 import sttp.model.sse.ServerSentEvent
@@ -81,13 +82,14 @@ object Endpoints {
   val streamServer: ZServerEndpoint[Any, ZioStreams] =
     streamPoint.zServerLogic(_ => ZIO.succeed(countTo10))
 
-  val results: PublicEndpoint[Unit, Unit, Array[Round], Any] = endpoint
+  implicit val codec: JsonValueCodec[ScoreWithTips] = JsonCodecMaker.make
+  val results: PublicEndpoint[Unit, Unit, ScrapeResultData, Any] = endpoint
     .get
     .in("results")
-    .out(jsonBody[Array[Round]])
+    .out(jsonBody[ScrapeResultData])
 
   val resultsServerEndpoint: ZServerEndpoint[Any, Any] =
-    results.serverLogicSuccess(_ => TempInterface.writtenArray.delay(1.seconds))
+    results.serverLogicSuccess(_ => TempInterface.writtenArray)
 
   val prometheusMetrics: PrometheusMetrics[Task] = PrometheusMetrics.default[Task]()
   val metricsEndpoint: ZServerEndpoint[Any, Any] = prometheusMetrics.metricsEndpoint

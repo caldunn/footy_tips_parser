@@ -7,9 +7,9 @@ object FileIO {
   def fileExists(path: Path): UIO[Boolean] =
     ZIO.attempt(os.exists(path)).orElse(ZIO.succeed(false))
 
-  def readRoundsFromFile(path: Path): Task[Array[Round]] =
+  def readCachedFile(path: Path): Task[ScrapeResultData] =
     ZIO.attempt {
-      Round.loadFromJsonStream {
+      ScrapeResultData.loadFromJsonStream {
         os.read.inputStream(path)
       }
     }

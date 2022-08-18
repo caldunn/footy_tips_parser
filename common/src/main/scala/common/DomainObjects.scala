@@ -3,9 +3,12 @@ package common
 import com.github.plokhotnyuk.jsoniter_scala.core.*
 import com.github.plokhotnyuk.jsoniter_scala.macros.{CodecMakerConfig, *}
 import common.Club.reversed
+
 import java.io.InputStream
+import java.time.{Instant, LocalDateTime}
 import scala.collection.mutable.ArrayBuffer
 
+import Implicits.*
 //given CodecMakerConfig.PrintCodec with {}
 
 case class ScorePair(score: Int, margin: Int) extends Ordered[ScorePair] {
@@ -55,8 +58,7 @@ enum Club {
 }
 
 //given CodecMakerConfig.PrintCodec with {}
-implicit val clubCodec: JsonValueCodec[Club] =
-  JsonCodecMaker.make[Club](CodecMakerConfig.withDiscriminatorFieldName(None))
+
 
 object Club {
   private val textMap: Map[String, Club] = Map(
@@ -90,16 +92,29 @@ case class Game(roundOrder: Int, home: Club, away: Club, winner: Club) {
   def loser: Club = if (home == winner) away else home
 }
 
-implicit val arrayRoundCodec: JsonValueCodec[Array[Round]] = JsonCodecMaker.make
-
 type ZippedPlayers = Array[((String, ScoreWithTips), Int)]
-case class Round(round: Int, scoreStats: Map[String, ScoreWithTips], games: Array[Game]) {
-  def sortByRoundScore: ZippedPlayers = scoreStats.toArray.sortBy(_._2.scoreStats.roundScore).reverse.zipWithIndex
-  def sortByTotalScore: ZippedPlayers = scoreStats.toArray.sortBy(_._2.scoreStats.totalScore).reverse.zipWithIndex
+case class Round(round: Int, players: Map[String, ScoreWithTips], games: Array[Game]) {
+  def sortByRoundScore: ZippedPlayers = players.toArray.sortBy(_._2.scoreStats.roundScore).reverse.zipWithIndex
+  def sortByTotalScore: ZippedPlayers = players.toArray.sortBy(_._2.scoreStats.totalScore).reverse.zipWithIndex
 }
-object Round {
-  private val writerConfig: WriterConfig                    = WriterConfig.withIndentionStep(2)
-  def arrayToJson(values: Array[Round]): String             = writeToString(values)
-  def arrayToJsonPretty(values: Array[Round]): String       = writeToString(values, writerConfig)
-  def loadFromJsonStream(stream: InputStream): Array[Round] = readFromStream(stream)
+
+
+case class ScrapeResultData(competitionID: Int, rounds: Array[Round], lastModifiedUTC: Instant = Instant.now()):
+  private lazy val writerConfig: WriterConfig                    = WriterConfig.withIndentionStep(2)
+  def arrayToJson(): String             = writeToString(this)
+  def arrayToJsonPretty(): String       = writeToString(this, writerConfig)
+  def appendRounds(newRounds: Array[Round]): ScrapeResultData =
+    ScrapeResultData(this.competitionID, rounds ++ newRounds)
+
+end ScrapeResultData
+
+object ScrapeResultData {
+  def loadFromJsonStream(stream: InputStream): ScrapeResultData = readFromStream(stream)
+}
+
+object Implicits {
+  implicit val clubCodec: JsonValueCodec[Club] =
+    JsonCodecMaker.make[Club](CodecMakerConfig.withDiscriminatorFieldName(None))
+
+  implicit val scrapeResultDataCodec: JsonValueCodec[ScrapeResultData] = JsonCodecMaker.make
 }

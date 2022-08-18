@@ -68,6 +68,8 @@ lazy val cliInterface = (project in file("cli-interface"))
 val tapirVersion = "1.0.3"
 lazy val tapirApi = (project in file("tapir-api"))
   .settings(
+    scalacOptions ++= Seq("-Xmax-inlines", "100"), // There is a long inlining process for circe. The compile times have
+    // immediately skyrocketed.
     name                := "tapir-api",
     reStart / mainClass := Some("tech.caleb.dunn.Main"),
     reLogTag            := "\u0008", // Sadge... Doesn't get rid of gap.

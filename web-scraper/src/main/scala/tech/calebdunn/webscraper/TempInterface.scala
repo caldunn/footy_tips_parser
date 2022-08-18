@@ -1,16 +1,17 @@
 package tech.calebdunn.webscraper
-import common.Round
+import common.{Round, ScrapeResultData}
 import org.slf4j.Logger
-import zio.{Chunk, Task, ZIO}
 import zio.stream.{Stream, ZStream}
+import zio.{Chunk, Task, ZIO}
 
-import scala.concurrent.{ExecutionContext, Future}
 import java.nio.file.{Files, Paths}
+import scala.concurrent.{ExecutionContext, Future}
 
 object TempInterface {
-  val writtenArray: Task[Array[Round]] =
+
+  val writtenArray: Task[ScrapeResultData] =
     ZIO.succeed(
-      Round.loadFromJsonStream(
+      ScrapeResultData.loadFromJsonStream(
         Files.newInputStream(
           Paths.get("/home/caleb/dev/jvm/scala/footy_tips_parser/dev_cache/scores/546660.json")
         )
@@ -44,10 +45,20 @@ object TempInterface {
       }
     }
 
-  def scrapeZIOSync(request: ScrapeRequest, range: Option[Range])(implicit
+  def scrapeZIOSync(
+    request: ScrapeRequest,
+    range: Option[Range],
+    scrapeResultData: Option[ScrapeResultData] =
+      None /*Not sure who should handle creating the data. Will here for now*/
+  )(implicit
     logger: Logger
-  ): Task[Array[Round]] =
+  ): Task[ScrapeResultData] =
     ZIO.attempt {
-      WebScraper.scrape(request, range)
+      val rounds = WebScraper.scrape(request, range)
+      scrapeResultData match {
+        case None    => ScrapeResultData(request.competition, rounds)
+        case Some(x) => x.appendRounds(rounds)
+      }
     }
+
 }

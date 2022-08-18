@@ -18,8 +18,8 @@ object Main extends ZIOAppDefault {
 
   enum CacheResult {
     case DoesNotExist
-    case PartiallyComplete(rounds: Array[Round])
-    case UpToDate(rounds: Array[Round])
+    case PartiallyComplete(rounds: ScrapeResultData)
+    case UpToDate(rounds: ScrapeResultData)
   }
 
   def checkCache(compID: Int): Task[CacheResult] =
@@ -27,11 +27,11 @@ object Main extends ZIOAppDefault {
 
     // Read a cached file into memory.
     val readFile: Task[CacheResult] =
-      FileIO.readRoundsFromFile(fp).flatMap { rounds =>
-        if (rounds.length == common.BigLazy.CURRENT_ROUND)
-          ZIO.succeed(CacheResult.UpToDate(rounds))
+      FileIO.readCachedFile(fp).flatMap { result =>
+        if (result.rounds.length == common.BigLazy.CURRENT_ROUND)
+          ZIO.succeed(CacheResult.UpToDate(result))
         else
-          ZIO.succeed(CacheResult.PartiallyComplete(rounds))
+          ZIO.succeed(CacheResult.PartiallyComplete(result))
       }
 
     for {
@@ -40,24 +40,26 @@ object Main extends ZIOAppDefault {
                 else readFile
     } yield status
 
-  def requestFromScraper(request: ScrapeRequest, range: Option[Range] = None): Task[Array[Round]] =
+  def requestFromScraper(
+    request: ScrapeRequest,
+    range: Option[Range] = None,
+    cachedData: Option[ScrapeResultData] = None
+  ): Task[ScrapeResultData] =
     for {
-      rounds <- TempInterface.scrapeZIOSync(request, range)
-    } yield rounds
+      data <- TempInterface.scrapeZIOSync(request, range, cachedData)
+    } yield data
 
-  def fetchRounds(status: CacheResult, request: ScrapeRequest): Task[Array[Round]] =
+  def fetchRounds(status: CacheResult, request: ScrapeRequest): Task[ScrapeResultData] =
     status match {
       case CacheResult.DoesNotExist => requestFromScraper(request)
-      case CacheResult.PartiallyComplete(rounds) =>
-        requestFromScraper(request, Some(rounds.length + 1 to BigLazy.CURRENT_ROUND)).flatMap(nr =>
-          ZIO.succeed(rounds ++ nr)
-        )
+      case CacheResult.PartiallyComplete(data) =>
+        requestFromScraper(request, Some(data.rounds.length + 1 to BigLazy.CURRENT_ROUND), Some(data))
       case CacheResult.UpToDate(rounds) => ZIO.succeed(rounds)
     }
 
-  def saveToCache(path: Path, rounds: Array[Round]): Task[Unit] =
+  def saveToCache(path: Path, result: ScrapeResultData): Task[Unit] =
     ZIO.attempt {
-      Round.arrayToJson(rounds)
+      result.arrayToJson()
     }.flatMap { s =>
       common.FileIO.writeToFile(path, s)
     }
@@ -77,8 +79,9 @@ object Main extends ZIOAppDefault {
       cachedResult  <- checkCache(scrapeRequest.competition)
       rounds        <- fetchRounds(cachedResult, scrapeRequest)
       f1            <- saveToCache(os.Path(s"$cache_dir/${scrapeRequest.competition}.json"), rounds).fork
-      _             <- ZIO.attempt(BasicSpreadSheet.default(rounds, s"${scrapeRequest.competition}.xlsx"))
+      _             <- ZIO.attempt(BasicSpreadSheet.default(rounds.rounds, s"${scrapeRequest.competition}.xlsx"))
       _             <- f1.join
+
     } yield ()
 
   def onUnhandledError(error: Any): IO[IOException, Unit] =
