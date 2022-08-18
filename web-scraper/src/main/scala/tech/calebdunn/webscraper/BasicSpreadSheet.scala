@@ -24,21 +24,21 @@ object BasicSpreadSheet {
    */
   type CellValueValid = String | Boolean | Double | java.util.Date | java.util.Calendar | java.time.LocalDateTime |
     RichTextString
-  extension (row: XSSFCell)
-    def fSetValue[A <: CellValueValid](value: A): XSSFCell =
+  extension (cell: XSSFCell)
+    def setValue(value: CellValueValid): XSSFCell =
       value match {
-        case x: String                  => row.setCellValue(x)
-        case x: Boolean                 => row.setCellValue(x)
-        case x: java.util.Date          => row.setCellValue(x)
-        case x: java.util.Calendar      => row.setCellValue(x)
-        case x: java.time.LocalDateTime => row.setCellValue(x)
-        case x: Double                  => row.setCellValue(x)
-        case x: RichTextString          => row.setCellValue(x)
+        case x: String                  => cell.setCellValue(x)
+        case x: Boolean                 => cell.setCellValue(x)
+        case x: java.util.Date          => cell.setCellValue(x)
+        case x: java.util.Calendar      => cell.setCellValue(x)
+        case x: java.time.LocalDateTime => cell.setCellValue(x)
+        case x: Double                  => cell.setCellValue(x)
+        case x: RichTextString          => cell.setCellValue(x)
       }
-      row
-    def fSetStyle(style: XSSFCellStyle): XSSFCell =
-      row.setCellStyle(style)
-      row
+      cell
+    def setStyle(style: XSSFCellStyle): XSSFCell =
+      cell.setCellStyle(style)
+      cell
 
   protected class StyleContainer(private val wb: XSSFWorkbook):
 
@@ -164,18 +164,22 @@ object BasicSpreadSheet {
   ): Unit = {
     val homeRow = sheet.createRow(offset)
     sheet.addMergedRegion(CellRangeAddress(offset, offset, 0, 1))
-    val roundCell = homeRow.createCell(0)
-    roundCell.setCellValue(s"ROUND ${round.round}")
-    roundCell.setCellStyle(styles.roundCell)
+    homeRow
+      .createCell(0)
+      .setValue(s"ROUND ${round.round}")
+      .setStyle(styles.roundCell)
 
     val formatter = java.text.DecimalFormat("#.#")
 
-    val avgScore = homeRow.createCell(2)
-    avgScore.setCellValue(s"Avg Score\n${formatter.format(scoreAveragePair.score)}")
-    avgScore.setCellStyle(styles.averages)
-    val avgMargin = homeRow.createCell(3)
-    avgMargin.setCellValue(s"Avg Margin\n${formatter.format(scoreAveragePair.margin)}")
-    avgMargin.setCellStyle(styles.averages)
+    homeRow
+      .createCell(2)
+      .setValue(s"Avg Score\n${formatter.format(scoreAveragePair.score)}")
+      .setStyle(styles.averages)
+
+    homeRow
+      .createCell(3)
+      .setValue(s"Avg Margin\n${formatter.format(scoreAveragePair.margin)}")
+      .setStyle(styles.averages)
 
     for ((game, i) <- round.games.zipWithIndex) {
       val rts = XSSFRichTextString(s"${game.home.toShortForm}\n${game.away.toShortForm}")
@@ -186,10 +190,10 @@ object BasicSpreadSheet {
       rts.applyFont(0, game.home.toShortForm.length, homeAwayFontWin._1)
       rts.applyFont(game.home.toShortForm.length + 1, rts.getString.length, homeAwayFontWin._2)
 
-      val cell = homeRow.createCell(i + TIP_START)
-      cell.setCellValue(rts)
-      cell.setCellStyle(styles.gameHeaderStyle)
-
+      homeRow
+        .createCell(i + TIP_START)
+        .setValue(rts)
+        .setStyle(styles.gameHeaderStyle)
     }
   }
 
@@ -201,9 +205,8 @@ object BasicSpreadSheet {
     val totals = players.foldLeft((0d, 0d)) { case (a, ((name, score), i)) =>
       val scoreStats = score.scoreStats
       val row        = sheet.createRow(offset + i + 1)
-      val pos        = row.createCell(0)
-      pos.setCellValue(i + 1)
 
+      row.createCell(0).setCellValue(i + 1)
       row.createCell(1).setCellValue(name)
       row.createCell(2).setCellValue(scoreStats.roundScore.score)
       row.createCell(3).setCellValue(scoreStats.roundScore.margin)
@@ -231,14 +234,13 @@ object BasicSpreadSheet {
       (a._1 + scoreStats.roundScore.score, a._2 + scoreStats.roundScore.margin)
     }
 
-    ScoreAveragePair((totals._1 / players.length), totals._2 / players.length)
+    ScoreAveragePair(totals._1 / players.length, totals._2 / players.length)
 
   private def generateSeparator(rowIndex: Int)(implicit sheet: XSSFSheet, styles: StyleContainer): Unit =
     sheet.addMergedRegion(CellRangeAddress(rowIndex, rowIndex, 0, 14))
     val row = sheet.createRow(rowIndex)
     row.setHeight((row.getHeight * 1.2).toShort)
-    val cell = row.createCell(0)
-    cell.setCellStyle(styles.separator)
+    row.createCell(0).setCellStyle(styles.separator)
 
   @tailrec
   private def writeRounds(rounds: Array[Round], orderOption: OrderOption, offset: Int)(implicit
