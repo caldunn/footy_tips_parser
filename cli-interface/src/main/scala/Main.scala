@@ -14,7 +14,7 @@ object Main extends ZIOAppDefault {
   given logger: org.slf4j.Logger = Logger(LoggerFactory.getLogger(getClass.getName)).underlying
 
   // Currently using a hardcoded location
-  val cache_dir = "/home/caleb/dev/jvm/scala/footy_tips_parser/dev_cache/scores/"
+  private val cache_dir = os.pwd / "dev_cache" / "scores"
 
   enum CacheResult {
     case DoesNotExist
@@ -23,8 +23,7 @@ object Main extends ZIOAppDefault {
   }
 
   def checkCache(compID: Int): Task[CacheResult] =
-    val fp = os.Path(s"$cache_dir$compID.json")
-
+    val fp = cache_dir / s"$compID.json"
     // Read a cached file into memory.
     val readFile: Task[CacheResult] =
       FileIO.readCachedFile(fp).flatMap { result =>
@@ -81,7 +80,6 @@ object Main extends ZIOAppDefault {
       f1            <- saveToCache(os.Path(s"$cache_dir/${scrapeRequest.competition}.json"), rounds).fork
       _             <- ZIO.attempt(BasicSpreadSheet.default(rounds.rounds, s"${scrapeRequest.competition}.xlsx"))
       _             <- f1.join
-
     } yield ()
 
   def onUnhandledError(error: Any): IO[IOException, Unit] =
