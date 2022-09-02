@@ -5,7 +5,7 @@ ThisBuild / organizationName  := "example"
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 // Versions
-val ZIO      = "0.0.0+1-e54a59df-SNAPSHOT"
+val ZIO      = "2.0.2" // "2.0.0+130-e54a59df+20220819-2239-SNAPSHOT"
 val STTP     = "3.7.1"
 val JSONITER = "2.13.38"
 
@@ -68,6 +68,8 @@ lazy val cliInterface = (project in file("cli-interface"))
 val tapirVersion = "1.0.3"
 lazy val tapirApi = (project in file("tapir-api"))
   .settings(
+    scalacOptions ++= Seq("-Xmax-inlines", "100"), // There is a long inlining process for circe. The compile times have
+    // immediately skyrocketed.
     name                := "tapir-api",
     reStart / mainClass := Some("tech.caleb.dunn.Main"),
     reLogTag            := "\u0008", // Sadge... Doesn't get rid of gap.

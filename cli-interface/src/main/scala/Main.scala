@@ -13,25 +13,25 @@ import java.io.IOException
 object Main extends ZIOAppDefault {
   given logger: org.slf4j.Logger = Logger(LoggerFactory.getLogger(getClass.getName)).underlying
 
-  // Currently using a hardcoded location
-  val cache_dir = "/home/caleb/dev/jvm/scala/footy_tips_parser/dev_cache/scores/"
+  private val cache_dir = os.pwd / "dev_cache" / "scores"
 
   enum CacheResult {
     case DoesNotExist
-    case PartiallyComplete(rounds: Array[Round])
-    case UpToDate(rounds: Array[Round])
+    case PartiallyComplete(rounds: ScrapeResultData)
+    case UpToDate(rounds: ScrapeResultData)
   }
 
   def checkCache(compID: Int): Task[CacheResult] =
-    val fp = os.Path(s"$cache_dir$compID.json")
-
+    val fp = cache_dir / s"$compID.json"
     // Read a cached file into memory.
     val readFile: Task[CacheResult] =
-      FileIO.readRoundsFromFile(fp).flatMap { rounds =>
-        if (rounds.length == common.BigLazy.CURRENT_ROUND)
-          ZIO.succeed(CacheResult.UpToDate(rounds))
+      FileIO.readCachedFile(fp).flatMap { result =>
+        if (result.rounds.length == common.BigLazy.CURRENT_ROUND)
+          printLine(s"Cache is up to date. No need to scrape again.") *>
+            ZIO.succeed(CacheResult.UpToDate(result))
         else
-          ZIO.succeed(CacheResult.PartiallyComplete(rounds))
+          printLine(s"${result.rounds.length} cached. Grabbing the rest now")
+            *> ZIO.succeed(CacheResult.PartiallyComplete(result))
       }
 
     for {
@@ -40,24 +40,26 @@ object Main extends ZIOAppDefault {
                 else readFile
     } yield status
 
-  def requestFromScraper(request: ScrapeRequest, range: Option[Range] = None): Task[Array[Round]] =
+  def requestFromScraper(
+    request: ScrapeRequest,
+    range: Option[Range] = None,
+    cachedData: Option[ScrapeResultData] = None
+  ): Task[ScrapeResultData] =
     for {
-      rounds <- TempInterface.scrapeZIOSync(request, range)
-    } yield rounds
+      data <- TempInterface.scrapeZIOSync(request, range, cachedData)
+    } yield data
 
-  def fetchRounds(status: CacheResult, request: ScrapeRequest): Task[Array[Round]] =
+  def fetchRounds(status: CacheResult, request: ScrapeRequest): Task[ScrapeResultData] =
     status match {
       case CacheResult.DoesNotExist => requestFromScraper(request)
-      case CacheResult.PartiallyComplete(rounds) =>
-        requestFromScraper(request, Some(rounds.length + 1 to BigLazy.CURRENT_ROUND)).flatMap(nr =>
-          ZIO.succeed(rounds ++ nr)
-        )
+      case CacheResult.PartiallyComplete(data) =>
+        requestFromScraper(request, Some(data.rounds.length + 1 to BigLazy.CURRENT_ROUND), Some(data))
       case CacheResult.UpToDate(rounds) => ZIO.succeed(rounds)
     }
 
-  def saveToCache(path: Path, rounds: Array[Round]): Task[Unit] =
+  def saveToCache(path: Path, result: ScrapeResultData): Task[Unit] =
     ZIO.attempt {
-      Round.arrayToJson(rounds)
+      result.arrayToJsonPretty()
     }.flatMap { s =>
       common.FileIO.writeToFile(path, s)
     }
@@ -76,8 +78,8 @@ object Main extends ZIOAppDefault {
       scrapeRequest <- ArgParsing.fromUpiFlag(args.last)
       cachedResult  <- checkCache(scrapeRequest.competition)
       rounds        <- fetchRounds(cachedResult, scrapeRequest)
-      f1            <- saveToCache(os.Path(s"$cache_dir/${scrapeRequest.competition}.json"), rounds).fork
-      _             <- ZIO.attempt(BasicSpreadSheet.default(rounds, s"${scrapeRequest.competition}.xlsx"))
+      f1            <- saveToCache(cache_dir / s"${scrapeRequest.competition}.json", rounds).fork
+      _             <- ZIO.attempt(BasicSpreadSheet.default(rounds.rounds, s"${scrapeRequest.competition}.xlsx"))
       _             <- f1.join
     } yield ()
 

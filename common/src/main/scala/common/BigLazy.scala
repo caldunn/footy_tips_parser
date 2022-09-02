@@ -1,5 +1,5 @@
 package common
 
 object BigLazy {
-  val CURRENT_ROUND = 22
+  val CURRENT_ROUND = 23
 }
