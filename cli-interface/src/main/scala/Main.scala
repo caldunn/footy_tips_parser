@@ -13,7 +13,6 @@ import java.io.IOException
 object Main extends ZIOAppDefault {
   given logger: org.slf4j.Logger = Logger(LoggerFactory.getLogger(getClass.getName)).underlying
 
-  // Currently using a hardcoded location
   private val cache_dir = os.pwd / "dev_cache" / "scores"
 
   enum CacheResult {
@@ -28,9 +27,11 @@ object Main extends ZIOAppDefault {
     val readFile: Task[CacheResult] =
       FileIO.readCachedFile(fp).flatMap { result =>
         if (result.rounds.length == common.BigLazy.CURRENT_ROUND)
-          ZIO.succeed(CacheResult.UpToDate(result))
+          printLine(s"Cache is up to date. No need to scrape again.") *>
+            ZIO.succeed(CacheResult.UpToDate(result))
         else
-          ZIO.succeed(CacheResult.PartiallyComplete(result))
+          printLine(s"${result.rounds.length} cached. Grabbing the rest now")
+            *> ZIO.succeed(CacheResult.PartiallyComplete(result))
       }
 
     for {
@@ -58,7 +59,7 @@ object Main extends ZIOAppDefault {
 
   def saveToCache(path: Path, result: ScrapeResultData): Task[Unit] =
     ZIO.attempt {
-      result.arrayToJson()
+      result.arrayToJsonPretty()
     }.flatMap { s =>
       common.FileIO.writeToFile(path, s)
     }
@@ -77,7 +78,7 @@ object Main extends ZIOAppDefault {
       scrapeRequest <- ArgParsing.fromUpiFlag(args.last)
       cachedResult  <- checkCache(scrapeRequest.competition)
       rounds        <- fetchRounds(cachedResult, scrapeRequest)
-      f1            <- saveToCache(os.Path(s"$cache_dir/${scrapeRequest.competition}.json"), rounds).fork
+      f1            <- saveToCache(cache_dir / s"${scrapeRequest.competition}.json", rounds).fork
       _             <- ZIO.attempt(BasicSpreadSheet.default(rounds.rounds, s"${scrapeRequest.competition}.xlsx"))
       _             <- f1.join
     } yield ()

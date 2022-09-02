@@ -5,7 +5,7 @@ ThisBuild / organizationName  := "example"
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 // Versions
-val ZIO      = "0.0.0+1-e54a59df-SNAPSHOT"
+val ZIO      = "2.0.2" // "2.0.0+130-e54a59df+20220819-2239-SNAPSHOT"
 val STTP     = "3.7.1"
 val JSONITER = "2.13.38"
 

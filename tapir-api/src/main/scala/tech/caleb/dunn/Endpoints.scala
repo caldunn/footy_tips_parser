@@ -9,11 +9,23 @@ import sttp.capabilities.zio.ZioStreams
 import sttp.model.sse.ServerSentEvent
 import sttp.tapir.generic.auto.*
 import sttp.tapir.json.jsoniter.*
-import sttp.tapir.server.http4s.ztapir.{ZHttp4sServerInterpreter, serverSentEventsBody}
+import sttp.tapir.server.http4s.ztapir.{
+  ZHttp4sServerInterpreter,
+  serverSentEventsBody
+}
 import sttp.tapir.server.metrics.prometheus.PrometheusMetrics
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import sttp.tapir.ztapir.*
-import sttp.tapir.{AnyEndpoint, CodecFormat, Endpoint, PublicEndpoint, Schema, endpoint, query, stringBody}
+import sttp.tapir.{
+  AnyEndpoint,
+  CodecFormat,
+  Endpoint,
+  PublicEndpoint,
+  Schema,
+  endpoint,
+  query,
+  stringBody
+}
 import tech.calebdunn.webscraper.*
 import zio.stream.{Stream, ZStream}
 import zio.{Schedule, Task, ZIO, durationInt}
@@ -21,8 +33,8 @@ import zio.{Schedule, Task, ZIO, durationInt}
 object Endpoints {
 
   implicit val codecSignin: JsonValueCodec[ScrapeRequest] = JsonCodecMaker.make
-  val signInEndpoint: PublicEndpoint[ScrapeRequest, Unit, MyStream, ZioStreams] = endpoint
-    .post
+  val signInEndpoint
+    : PublicEndpoint[ScrapeRequest, Unit, MyStream, ZioStreams] = endpoint.post
     .in("signin")
     .in(jsonBody[ScrapeRequest])
     .out(serverSentEventsBody)
@@ -33,20 +45,20 @@ object Endpoints {
     }
 
   type pingEndpointHeaders = (Option[String], Option[Int])
-  val pingEndpoint: PublicEndpoint[pingEndpointHeaders, Unit, String, Any] = endpoint
-    .get
-    .in("ping")
-    .in(header[Option[String]]("my-header"))
-    .in(header[Option[Int]]("my-age"))
-    .out(stringBody)
+  val pingEndpoint: PublicEndpoint[pingEndpointHeaders, Unit, String, Any] =
+    endpoint.get
+      .in("ping")
+      .in(header[Option[String]]("my-header"))
+      .in(header[Option[Int]]("my-age"))
+      .out(stringBody)
 
   val pingServerEndpoint: ZServerEndpoint[Any, Any] =
     pingEndpoint.serverLogicSuccess { v =>
       ZIO.succeed("pong")
     }
 
-  val pingPersonEndpoint: PublicEndpoint[pingEndpointHeaders, Unit, String, Any] = endpoint
-    .get
+  val pingPersonEndpoint
+    : PublicEndpoint[pingEndpointHeaders, Unit, String, Any] = endpoint.get
     .in("pingCrash")
     .in(header[Option[String]]("my-header"))
     .in(header[Option[Int]]("my-age"))
@@ -61,38 +73,53 @@ object Endpoints {
     }
 
   type MyStream = Stream[Throwable, ServerSentEvent]
-  val streamPoint: PublicEndpoint[Unit, Unit, MyStream, ZioStreams] = endpoint
-    .get
-    .in("cd")
-    .out(serverSentEventsBody)
+  val streamPoint: PublicEndpoint[Unit, Unit, MyStream, ZioStreams] =
+    endpoint.get
+      .in("cd")
+      .out(serverSentEventsBody)
 
   val countTo10: MyStream =
     ZStream
       .fromIterable(1 to 10)
-      .map(i => ServerSentEvent(Some(s"round -> $i!"), id = Some(s"$i"), eventType = Some("round-update")))
+      .map(
+        i =>
+          ServerSentEvent(
+            Some(s"round -> $i!"),
+            id = Some(s"$i"),
+            eventType = Some("round-update")
+        )
+      )
       .schedule(Schedule.spaced(500.millis))
       .tap(zio.Console.printLine(_)) ++ more
 
   val more: MyStream =
     ZStream
       .fromIterable(11 to 20)
-      .map(i => ServerSentEvent(Some(s"round -> $i!"), id = Some(s"$i"), eventType = Some("round-update")))
+      .map(
+        i =>
+          ServerSentEvent(
+            Some(s"round -> $i!"),
+            id = Some(s"$i"),
+            eventType = Some("round-update")
+        )
+      )
       .schedule(Schedule.spaced(500.millis))
 
   val streamServer: ZServerEndpoint[Any, ZioStreams] =
     streamPoint.zServerLogic(_ => ZIO.succeed(countTo10))
 
   implicit val codec: JsonValueCodec[ScoreWithTips] = JsonCodecMaker.make
-  val results: PublicEndpoint[Unit, Unit, ScrapeResultData, Any] = endpoint
-    .get
+  val results: PublicEndpoint[Unit, Unit, ScrapeResultData, Any] = endpoint.get
     .in("results")
     .out(jsonBody[ScrapeResultData])
 
   val resultsServerEndpoint: ZServerEndpoint[Any, Any] =
     results.serverLogicSuccess(_ => TempInterface.writtenArray)
 
-  val prometheusMetrics: PrometheusMetrics[Task] = PrometheusMetrics.default[Task]()
-  val metricsEndpoint: ZServerEndpoint[Any, Any] = prometheusMetrics.metricsEndpoint
+  val prometheusMetrics: PrometheusMetrics[Task] =
+    PrometheusMetrics.default[Task]()
+  val metricsEndpoint: ZServerEndpoint[Any, Any] =
+    prometheusMetrics.metricsEndpoint
 
   val forDocs: List[AnyEndpoint] = List(
     metricsEndpoint.endpoint,
