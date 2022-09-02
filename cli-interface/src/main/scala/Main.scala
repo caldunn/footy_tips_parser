@@ -13,7 +13,11 @@ import java.io.IOException
 object Main extends ZIOAppDefault {
   given logger: org.slf4j.Logger = Logger(LoggerFactory.getLogger(getClass.getName)).underlying
 
-  private val cache_dir = os.pwd / "dev_cache" / "scores"
+  private lazy val cache_dir = {
+    val dir = os.pwd / "dev_cache" / "scores"
+    if !os.exists(dir) then os.makeDir.all(dir)
+    dir
+  }
 
   enum CacheResult {
     case DoesNotExist
@@ -30,8 +34,8 @@ object Main extends ZIOAppDefault {
           printLine(s"Cache is up to date. No need to scrape again.") *>
             ZIO.succeed(CacheResult.UpToDate(result))
         else
-          printLine(s"${result.rounds.length} cached. Grabbing the rest now")
-            *> ZIO.succeed(CacheResult.PartiallyComplete(result))
+          printLine(s"${result.rounds.length} cached. Grabbing the rest now") *>
+            ZIO.succeed(CacheResult.PartiallyComplete(result))
       }
 
     for {
@@ -75,7 +79,7 @@ object Main extends ZIOAppDefault {
   val app: ZIO[ZIOAppArgs, Any, Unit] =
     for {
       args          <- getArgs
-      scrapeRequest <- ArgParsing.fromUpiFlag(args.last)
+      scrapeRequest <- ArgParsing.fromUpiFlag(args.lastOption)
       cachedResult  <- checkCache(scrapeRequest.competition)
       rounds        <- fetchRounds(cachedResult, scrapeRequest)
       f1            <- saveToCache(cache_dir / s"${scrapeRequest.competition}.json", rounds).fork

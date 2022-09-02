@@ -16,9 +16,10 @@ object ArgParsing {
                 .toMap
     } yield asMap
 
-  def fromUpiFlag(s: String): Task[ScrapeRequest] =
+  def fromUpiFlag(s: Option[String]): Task[ScrapeRequest] =
     ZIO.attempt {
-      val parts = s.split(":")
+      if (s.isEmpty) throw Exception("Please provide login details. Refer to Readme")
+      val parts = s.get.split(":")
       if (parts.length != 3) throw Exception("Invalid input")
       else
         val compID = parts
