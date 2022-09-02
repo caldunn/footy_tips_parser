@@ -22,6 +22,7 @@ import java.util.stream.{Collectors, StreamSupport}
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
 /**
  * Used to scrape a new competition.
@@ -93,18 +94,20 @@ object WebScraper {
           "https://www.footytips.com.au/competitions/afl/siteladder"
         )
 
-      val currentRound = wait.until { driver =>
-        driver.findElement(
-          By.id("round")
-        )
-      }.getText
-        .split("\n")
-        .dropRight(1)
-        .last
-        .split(" ")
-        .last
-        .toInt
-
+      val currentRound =
+        Try {
+          wait.until { driver =>
+            driver.findElement(
+              By.id("round")
+            )
+          }.getText
+            .split("\n")
+            .dropRight(1)
+            .last
+            .split(" ")
+            .last
+            .toInt
+        }.getOrElse(23)
       val mRange = range match {
         case Some(value) => value
         case None        => 1 to currentRound

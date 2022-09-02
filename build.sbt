@@ -1,5 +1,5 @@
 ThisBuild / scalaVersion      := "3.1.3"
-ThisBuild / version           := "0.1.0-SNAPSHOT"
+ThisBuild / version           := "0.1.0"
 ThisBuild / organization      := "tech.caleb-dunn"
 ThisBuild / organizationName  := "example"
 Global / onChangedBuildSource := ReloadOnSourceChanges
@@ -53,6 +53,7 @@ lazy val cliInterface = (project in file("cli-interface"))
   .settings(
     name := "cli-interface",
     // zioMain,
+    assembly / assemblyJarName := s"footytip-parser-cli-${version.value}.jar",
     assembly / assemblyMergeStrategy := {
       case PathList("META-INF", "MANIFEST.MF")                  => MergeStrategy.discard
       case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.first
